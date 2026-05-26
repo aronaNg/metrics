@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modernisation du système - Comparaison de performance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root{
+    --bg:#f6f4ef;
+    --surface:#ffffff;
+    --ink:#1d1b17;
+    --ink-soft:#5f5c54;
+    --ink-faint:#8d897e;
+    --line:#e6e1d7;
+    --old:#a9a399;
+    --accent:#EC6713;          /* orange Keepso - light mode */
+    --accent-strong:#FF5200;   /* orange Keepso vif */
+    --accent-soft:#fdeede;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(29,27,23,.04), 0 8px 24px rgba(29,27,23,.05);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#17150f;
+      --surface:#211e17;
+      --ink:#f3efe6;
+      --ink-soft:#b3ac9d;
+      --ink-faint:#807a6c;
+      --line:#332f25;
+      --old:#6f6a5e;
+      --accent:#F07A1A;        /* orange Keepso - dark mode */
+      --accent-strong:#FF5200;
+      --accent-soft:#3a2410;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.6;
+    -webkit-font-smoothing:antialiased;padding:0 0 5rem;
+  }
+  .wrap{max-width:1040px;margin:0 auto;padding:0 1.5rem;}
+
+  header.hero{
+    border-bottom:1px solid var(--line);
+    padding:3.5rem 0 3rem;margin-bottom:3rem;position:relative;overflow:hidden;
+  }
+  header.hero::after{
+    content:"";position:absolute;top:0;left:0;width:100%;height:4px;
+    background:linear-gradient(90deg,var(--accent-strong),var(--accent));
+  }
+  .eyebrow{
+    font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);font-weight:600;margin-bottom:1rem;
+  }
+  h1{
+    font-family:'Fraunces',serif;font-weight:500;
+    font-size:clamp(2rem,4vw,3rem);line-height:1.1;
+    letter-spacing:-.01em;max-width:18ch;margin-bottom:1rem;
+  }
+  .sub{font-size:1.05rem;color:var(--ink-soft);max-width:58ch;}
+
+  .section-label{
+    font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--ink-faint);font-weight:600;margin-bottom:1.25rem;
+  }
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-bottom:3.5rem;}
+  .kpi{
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:1.6rem 1.5rem;box-shadow:var(--shadow);
+    position:relative;overflow:hidden;
+  }
+  .kpi::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent);}
+  .kpi .label{font-size:.85rem;color:var(--ink-soft);margin-bottom:.6rem;}
+  .kpi .value{font-family:'Fraunces',serif;font-weight:500;font-size:2.4rem;line-height:1;letter-spacing:-.01em;color:var(--ink);}
+  .kpi.highlight .value{color:var(--accent);}
+  .kpi .hint{font-size:.8rem;color:var(--ink-faint);margin-top:.5rem;}
+
+  .panel{
+    background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:1.75rem;box-shadow:var(--shadow);margin-bottom:3.5rem;
+  }
+  .panel h2{font-family:'Fraunces',serif;font-weight:500;font-size:1.4rem;margin-bottom:.4rem;letter-spacing:-.01em;}
+  .panel .panel-sub{font-size:.9rem;color:var(--ink-soft);margin-bottom:1.5rem;}
+  .chart-box{position:relative;width:100%;height:340px;}
+
+  table{width:100%;border-collapse:collapse;font-size:.92rem;}
+  thead th{text-align:left;font-weight:600;color:var(--ink-faint);font-size:.78rem;letter-spacing:.06em;text-transform:uppercase;padding:0 .75rem .75rem;border-bottom:1px solid var(--line);}
+  thead th.num{text-align:right;}
+  tbody td{padding:.7rem .75rem;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  .gain-pill{display:inline-block;background:var(--accent-soft);color:var(--accent);font-weight:600;font-size:.82rem;padding:.2rem .6rem;border-radius:20px;}
+  input[type=text],input[type=number]{font-family:inherit;font-size:.92rem;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.45rem .6rem;width:100%;background:var(--surface);transition:border-color .15s;}
+  input[type=number]{text-align:right;width:110px;}
+  input:focus{outline:none;border-color:var(--accent);}
+  .row-del{border:none;background:none;cursor:pointer;color:var(--ink-faint);font-size:1.1rem;line-height:1;padding:.3rem;border-radius:6px;transition:.15s;}
+  .row-del:hover{color:var(--accent-strong);background:var(--accent-soft);}
+  .btn{font-family:inherit;font-size:.9rem;font-weight:500;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:.55rem 1rem;border-radius:9px;transition:.15s;}
+  .btn:hover{border-color:var(--accent);color:var(--accent);}
+  .editor-actions{margin-top:1.25rem;display:flex;gap:.75rem;align-items:center;}
+
+  .params{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.5rem;}
+  .param label{font-size:.85rem;color:var(--ink-soft);display:flex;justify-content:space-between;margin-bottom:.5rem;}
+  .param label b{color:var(--ink);font-weight:600;}
+  input[type=range]{width:100%;accent-color:var(--accent);}
+  .toggle-note{font-size:.82rem;color:var(--ink-faint);margin-top:1.25rem;}
+
+  .method{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:var(--radius);padding:1.5rem 1.75rem;}
+  .method h2{font-family:'Fraunces',serif;font-weight:500;font-size:1.2rem;margin-bottom:.75rem;}
+  .method ul{list-style:none;}
+  .method li{padding-left:1.5rem;position:relative;margin-bottom:.55rem;font-size:.92rem;color:var(--ink-soft);}
+  .method li::before{content:"";position:absolute;left:0;top:.6em;width:6px;height:6px;border-radius:50%;background:var(--accent);}
+
+  footer{margin-top:3.5rem;text-align:center;font-size:.82rem;color:var(--ink-faint);}
+  .grid-2{display:grid;grid-template-columns:1fr;gap:2rem;}
+  @media(min-width:860px){.grid-2{grid-template-columns:3fr 2fr;}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Modernisation de l'ERP Keepso</div>
+    <h1>Migration vers une architecture moderne&nbsp;: l'impact mesuré</h1>
+    <p class="sub">Comparaison des temps de réponse entre l'ancien système (PHP / HTML) et le nouveau système (Laravel / React), mesurés dans des conditions identiques.</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="section-label">Résultats clés</div>
+  <div class="kpis">
+    <div class="kpi highlight">
+      <div class="label">Gain de vitesse moyen</div>
+      <div class="value" id="kpiSpeed">-</div>
+      <div class="hint">sur l'ensemble des actions</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Temps de réponse économisé / an</div>
+      <div class="value" id="kpiHours">-</div>
+      <div class="hint">cumul sur tous les postes</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Attente évitée / jour / opérateur</div>
+      <div class="value" id="kpiDay">-</div>
+      <div class="hint">temps d'attente devant l'écran</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Temps de réponse par action</h2>
+    <p class="panel-sub">Durée en millisecondes - plus la barre est courte, plus l'action est rapide.</p>
+    <div class="chart-box">
+      <canvas id="chart" role="img" aria-label="Graphique en barres comparant le temps de chaque action entre l'ancien système PHP et le nouveau système Laravel React">Comparaison des temps de réponse par action entre l'ancien et le nouveau système.</canvas>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="panel" style="margin-bottom:0;">
+      <h2>Données mesurées</h2>
+      <p class="panel-sub">Médianes relevées sur plusieurs essais. Modifiable directement.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Action</th>
+            <th class="num">Ancien (ms)</th>
+            <th class="num">Nouveau (ms)</th>
+            <th class="num">Gain</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="editor-actions">
+        <button class="btn" id="addRow">+ Ajouter une action</button>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:0;">
+      <h2>Volume d'exploitation</h2>
+      <p class="panel-sub">Ajuste pour refléter l'usage réel.</p>
+      <div class="params">
+        <div class="param">
+          <label>Actions / jour / poste <b id="freqOut">10</b></label>
+          <input type="range" id="freq" min="1" max="100" value="10" step="1">
+        </div>
+        <div class="param">
+          <label>Postes / opérateurs <b id="postesOut">2</b></label>
+          <input type="range" id="postes" min="1" max="10" value="2" step="1">
+        </div>
+        <div class="param">
+          <label>Jours travaillés / an <b id="joursOut">220</b></label>
+          <input type="range" id="jours" min="200" max="260" value="220" step="5">
+        </div>
+      </div>
+      <p class="toggle-note">Les indicateurs en haut de page se recalculent automatiquement.</p>
+    </div>
+  </div>
+
+  <div style="height:3.5rem;"></div>
+
+  <div class="section-label">Méthodologie</div>
+  <div class="method">
+    <h2>Une comparaison établie dans des conditions identiques avec l'OT 124503</h2>
+    <ul>
+      <li>Mesures réalisées sur le même poste, le même réseau et les mêmes données de production.</li>
+      <li>Nous avons choisi l'OT avec la référence qui dispose de plus de critères.</li>
+      <li>Le temps de réponse correspond au délai entre l'action de l'opérateur et l'affichage complet du résultat à l'écran.</li>
+      <li>Au-delà de la vitesse, la nouvelle architecture apporte une meilleure fiabilité et une maintenance facilitée sur le long terme.</li>
+    </ul>
+  </div>
+
+  <footer>
+    Document interne - Comparaison de performance entre l'ancien keepso et le nouveau · <span id="today"></span>
+  </footer>
+
+</main>
+
+<script>
+(function(){
+  // ====== DONNÉES : remplace ces valeurs par tes mesures réelles ====== pour les autres il reste les mertics sur le nouveau keepso
+  var data = [
+    {name:"Chargement machine",      old:25080, neo:1110}, //Fait
+    {name:"Consommables prod",         old:2100, neo:790},
+    {name:"Etalonnage",   old:11350, neo:300}, //Fait
+    {name:"Test pièces types",         old:6360, neo:500},
+    {name:"Saisie production",       old:7020, neo:600}, //Fait
+    {name:"Passage Nok",         old:5980, neo:700},
+    {name:"Analyse rébuts 1",         old:6210, neo:390},
+    {name:"RAZ",         old:6810, neo:460},
+    {name:"Analyse rébuts RAZ",         old:6350, neo:390},
+    {name:"Analyse 1er tri",         old:6220, neo:390},
+    {name:"Fin de lot",              old:9720, neo:400}, //Fait
+    {name:"Livraison partielle",         old:16700, neo:800},
+
+  ];
+  // ====================================================================
+
+  var tbody = document.getElementById('tbody');
+  var chart;
+
+  function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+  function fmtGain(d){
+    if(d.old>0 && d.neo>0){ return '\u00d7'+(d.old/d.neo).toFixed(1).replace('.',','); }
+    return '\u2014';
+  }
+
+  function renderRows(){
+    tbody.innerHTML='';
+    data.forEach(function(d,i){
+      var tr=document.createElement('tr');
+      tr.innerHTML=
+        '<td><input type="text" value="'+d.name.replace(/"/g,'&quot;')+'" data-i="'+i+'" data-f="name"></td>'+
+        '<td class="num"><input type="number" min="0" value="'+d.old+'" data-i="'+i+'" data-f="old"></td>'+
+        '<td class="num"><input type="number" min="0" value="'+d.neo+'" data-i="'+i+'" data-f="neo"></td>'+
+        '<td class="num"><span class="gain-pill">'+fmtGain(d)+'</span></td>'+
+        '<td class="num"><button class="row-del" data-del="'+i+'" aria-label="Supprimer la ligne">&times;</button></td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  function recompute(){
+    var freq=+document.getElementById('freq').value;
+    var postes=+document.getElementById('postes').value;
+    var jours=+document.getElementById('jours').value;
+    document.getElementById('freqOut').textContent=freq;
+    document.getElementById('postesOut').textContent=postes;
+    document.getElementById('joursOut').textContent=jours;
+
+    var ratios=[], totalSavedMs=0;
+    data.forEach(function(d){
+      if(d.old>0 && d.neo>0) ratios.push(d.old/d.neo);
+      totalSavedMs += Math.max(0, d.old - d.neo);
+    });
+    var avgRatio = ratios.length ? ratios.reduce(function(a,b){return a+b;},0)/ratios.length : 0;
+    var savedSecYear = (totalSavedMs/1000)*freq*postes*jours;
+    var savedHours = savedSecYear/3600;
+    var savedSecDayOp = (totalSavedMs/1000)*freq;
+
+    document.getElementById('kpiSpeed').textContent = avgRatio ? '\u00d7'+avgRatio.toFixed(1).replace('.',',') : '\u2014';
+    document.getElementById('kpiHours').textContent = savedHours>=1
+      ? Math.round(savedHours).toLocaleString('fr-FR')+' h'
+      : Math.round(savedHours*60)+' min';
+    document.getElementById('kpiDay').textContent = savedSecDayOp>=60
+      ? (savedSecDayOp/60).toFixed(1).replace('.',',')+' min'
+      : Math.round(savedSecDayOp)+' s';
+
+    if(chart){
+      chart.data.labels=data.map(function(d){return d.name;});
+      chart.data.datasets[0].data=data.map(function(d){return d.old;});
+      chart.data.datasets[1].data=data.map(function(d){return d.neo;});
+      chart.update();
+    }
+  }
+
+  tbody.addEventListener('input',function(e){
+    var i=e.target.getAttribute('data-i'), f=e.target.getAttribute('data-f');
+    if(i!==null){
+      data[i][f] = f==='name' ? e.target.value : (+e.target.value||0);
+      if(f!=='name'){
+        var pill=e.target.closest('tr').querySelector('.gain-pill');
+        if(pill) pill.textContent=fmtGain(data[i]);
+      }
+      recompute();
+    }
+  });
+  tbody.addEventListener('click',function(e){
+    var del=e.target.closest('[data-del]');
+    if(del){ data.splice(+del.getAttribute('data-del'),1); renderRows(); recompute(); }
+  });
+  document.getElementById('addRow').addEventListener('click',function(){
+    data.push({name:"Nouvelle action",old:1000,neo:200}); renderRows(); recompute();
+  });
+  ['freq','postes','jours'].forEach(function(id){
+    document.getElementById(id).addEventListener('input',recompute);
+  });
+
+  renderRows();
+
+  var dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  var accent = css('--accent') || '#EC6713';
+  var oldCol = dark ? '#6f6a5e' : '#a9a399';
+  var gridCol = dark ? '#332f25' : '#e6e1d7';
+  var tickCol = dark ? '#b3ac9d' : '#5f5c54';
+  var labelCol = dark ? '#f3efe6' : '#1d1b17';
+  var faintCol = dark ? '#807a6c' : '#8d897e';
+
+  chart=new Chart(document.getElementById('chart'),{
+    type:'bar',
+    data:{labels:data.map(function(d){return d.name;}),datasets:[
+      {label:'Ancien syst\u00e8me (PHP)',data:data.map(function(d){return d.old;}),backgroundColor:oldCol,borderRadius:4,maxBarThickness:46},
+      {label:'Nouveau syst\u00e8me (Laravel / React)',data:data.map(function(d){return d.neo;}),backgroundColor:accent,borderRadius:4,maxBarThickness:46}
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      scales:{
+        y:{beginAtZero:true,grid:{color:gridCol},ticks:{color:tickCol,callback:function(v){return v>=1000?(v/1000)+' s':v+' ms';}},title:{display:true,text:'Temps de r\u00e9ponse (plus bas = mieux)',color:faintCol,font:{size:11}}},
+        x:{grid:{display:false},ticks:{color:labelCol,font:{size:12},autoSkip:false,maxRotation:25}}
+      },
+      plugins:{legend:{display:true,position:'top',align:'end',labels:{color:tickCol,boxWidth:12,boxHeight:12,padding:18,font:{size:12.5}}},
+               tooltip:{callbacks:{label:function(c){return c.dataset.label+': '+(c.parsed.y>=1000?(c.parsed.y/1000)+' s':c.parsed.y+' ms');}}}}
+    }
+  });
+
+  recompute();
+
+  var d=new Date();
+  document.getElementById('today').textContent=d.toLocaleDateString('fr-FR',{year:'numeric',month:'long'});
+})();
+</script>
+</body>
+</html>
