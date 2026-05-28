@@ -40,3 +40,18 @@ WHERE pes.event_datetime >= '2025-01-01'
   AND pes.event_datetime < '2026-01-01'
 GROUP BY pes.event_type, et.description
 ORDER BY avg_per_order DESC;
+
+-----------------
+Nombre de machine par site
+SELECT
+    AVG(machines_used) AS avg_machines_per_day
+FROM (
+    SELECT
+        DATE(sorting_start_at) AS day,
+        COUNT(DISTINCT machine_id) AS machines_used
+    FROM orders
+    WHERE sorting_start_at >= '2025-01-01'
+      AND sorting_start_at < '2026-01-01'
+      AND machine_id IS NOT NULL
+    GROUP BY DATE(sorting_start_at)
+) AS daily_machines;
