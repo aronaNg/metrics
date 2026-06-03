@@ -95,6 +95,7 @@
   thead th.num{text-align:right;}
   tbody td{padding:.7rem .75rem;border-bottom:1px solid var(--line);vertical-align:middle;}
   tbody tr:last-child td{border-bottom:none;}
+  tfoot td{padding:.85rem .75rem 0;border-top:1px solid var(--line);font-weight:600;color:var(--ink);}
   td.num{text-align:right;font-variant-numeric:tabular-nums;}
   .gain-pill{display:inline-block;background:var(--accent-soft);color:var(--accent);font-weight:600;font-size:.82rem;padding:.2rem .6rem;border-radius:20px;}
   input[type=text],input[type=number]{font-family:inherit;font-size:.92rem;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:.45rem .6rem;width:100%;background:var(--surface);transition:border-color .15s;}
@@ -145,10 +146,10 @@
     <div class="kpi">
       <div class="label">Temps de réponse économisé / an</div>
       <div class="value" id="kpiHours">-</div>
-      <div class="hint">cumul sur tous les postes</div>
+      <div class="hint">sur le volume renseigné</div>
     </div>
     <div class="kpi">
-      <div class="label">Attente évitée / jour / opérateur</div>
+      <div class="label">Attente moyenne évitée par jour pour l'ensemble des équipes</div>
       <div class="value" id="kpiDay">-</div>
       <div class="hint">temps d'attente devant l'écran</div>
     </div>
@@ -173,11 +174,21 @@
             <th class="num">Ancien (ms)</th>
             <th class="num">Nouveau (ms)</th>
             <th class="num">Apparitions / commande</th>
+            <th class="num">Gain (ms) par action</th>
+            <th class="num">Gain sur le lot (s)</th>
             <th class="num">Gain</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4">Total</td>
+            <td class="num" id="totalGainMs">-</td>
+            <td class="num" id="totalGainLot">-</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
       </table>
       <div class="editor-actions">
         <button class="btn" id="addRow">+ Ajouter une action</button>
@@ -188,12 +199,8 @@
       <h2>Volume d'exploitation</h2>
       <div class="params">
         <div class="param">
-          <label>Tris / jour / poste <b id="freqOut">23</b></label>
+          <label>Moyenne tri par jour et site <b id="freqOut">23</b></label>
           <input type="range" id="freq" min="1" max="50" value="23" step="1">
-        </div>
-        <div class="param">
-          <label>Postes / opérateurs <b id="postesOut">2</b></label>
-          <input type="range" id="postes" min="1" max="10" value="2" step="1">
         </div>
         <div class="param">
           <label>Jours travaillés / an <b id="joursOut">220</b></label>
@@ -227,7 +234,7 @@
 (function(){
   // ====== DONNÉES : remplace ces valeurs par tes mesures réelles ====== pour les autres il reste les mertics sur le nouveau keepso
   var data = [
-    {name:"Chargement machine",   old:25080, neo:1110, freq:1},
+    {name:"Chargement machine",   old:15080, neo:1110, freq:1},
     {name:"Consommables prod",     old:2100, neo:260,  freq:1.09},
     {name:"Etalonnage",           old:11350, neo:140,  freq:4.29},
     {name:"Test pièces types",     old:6360, neo:130,  freq:4.48},
@@ -253,6 +260,39 @@
     return '\u2014';
   }
 
+  function fmtGainMs(d){
+    var gain = Math.max(0, d.old - d.neo);
+    return gain.toLocaleString('fr-FR')+' ms';
+  }
+
+  function normName(v){
+    return (v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  }
+
+  function isChargementMachine(d){
+    return normName(d.name)==='chargement machine';
+  }
+
+  function isEtalonnage(d){
+    return normName(d.name)==='etalonnage';
+  }
+
+  function getChargementMachineFreq(){
+    return data.reduce(function(total,d){
+      if(isChargementMachine(d) || isEtalonnage(d)) return total;
+      return total + (d.freq||1);
+    },0);
+  }
+
+  function getLotFreq(d){
+    return isChargementMachine(d) ? getChargementMachineFreq() : (d.freq||1);
+  }
+
+  function fmtGainLot(d){
+    var gain = Math.max(0, d.old - d.neo) * getLotFreq(d);
+    return (gain/1000).toLocaleString('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1})+' s';
+  }
+
   function fmtFreq(v){
     return (Math.round(v*100)/100).toString().replace('.',',');
   }
@@ -261,11 +301,15 @@
     tbody.innerHTML='';
     data.forEach(function(d,i){
       var tr=document.createElement('tr');
+      var freqValue = getLotFreq(d);
+      var freqAttrs = isChargementMachine(d) ? ' readonly aria-label="Coefficient calcul\u00e9 automatiquement"' : '';
       tr.innerHTML=
         '<td><input type="text" value="'+d.name.replace(/"/g,'&quot;')+'" data-i="'+i+'" data-f="name"></td>'+
         '<td class="num"><input type="number" min="0" value="'+d.old+'" data-i="'+i+'" data-f="old"></td>'+
         '<td class="num"><input type="number" min="0" value="'+d.neo+'" data-i="'+i+'" data-f="neo"></td>'+
-        '<td class="num"><input type="number" min="0" step="0.01" value="'+d.freq+'" data-i="'+i+'" data-f="freq"></td>'+
+        '<td class="num"><input type="number" min="0" step="0.01" value="'+(Math.round(freqValue*100)/100)+'" data-i="'+i+'" data-f="freq"'+freqAttrs+'></td>'+
+        '<td class="num gain-ms">'+fmtGainMs(d)+'</td>'+
+        '<td class="num gain-lot">'+fmtGainLot(d)+'</td>'+
         '<td class="num"><span class="gain-pill">'+fmtGain(d)+'</span></td>'+
         '<td class="num"><button class="row-del" data-del="'+i+'" aria-label="Supprimer la ligne">&times;</button></td>';
       tbody.appendChild(tr);
@@ -274,33 +318,41 @@
 
   function recompute(){
     var freq=+document.getElementById('freq').value;
-    var postes=+document.getElementById('postes').value;
     var jours=+document.getElementById('jours').value;
     document.getElementById('freqOut').textContent=freq;
-    document.getElementById('postesOut').textContent=postes;
     document.getElementById('joursOut').textContent=jours;
 
-    var ratios=[], totalSavedMs=0;
+    var ratios=[], totalGainMs=0, totalSavedMs=0;
     data.forEach(function(d){
-      var f = d.freq||1;
+      var f = getLotFreq(d);
+      totalGainMs += Math.max(0, d.old - d.neo);
       if(d.old>0 && d.neo>0) ratios.push(d.old/d.neo);
       totalSavedMs += Math.max(0, d.old - d.neo) * f;
     });
     var avgRatio = ratios.length ? ratios.reduce(function(a,b){return a+b;},0)/ratios.length : 0;
-    var savedSecYear = (totalSavedMs/1000)*freq*postes*jours;
+    var savedSecYear = (totalSavedMs/1000)*freq*jours;
     var savedHours = savedSecYear/3600;
+    var savedDays = savedHours/24;
     var savedSecDayOp = (totalSavedMs/1000)*freq;
 
     document.getElementById('kpiSpeed').textContent = avgRatio ? '\u00d7'+avgRatio.toFixed(1).replace('.',',') : '\u2014';
     document.getElementById('kpiHours').textContent = savedHours>=1
-      ? Math.round(savedHours).toLocaleString('fr-FR')+' h'
+      ? Math.round(savedHours).toLocaleString('fr-FR')+' h ('+savedDays.toLocaleString('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1})+' j)'
       : Math.round(savedHours*60)+' min';
     document.getElementById('kpiDay').textContent = savedSecDayOp>=60
       ? (savedSecDayOp/60).toFixed(1).replace('.',',')+' min'
       : Math.round(savedSecDayOp)+' s';
+    document.getElementById('totalGainMs').textContent = totalGainMs.toLocaleString('fr-FR')+' ms';
+    document.getElementById('totalGainLot').textContent = (totalSavedMs/1000).toLocaleString('fr-FR',{minimumFractionDigits:1,maximumFractionDigits:1})+' s';
+    data.forEach(function(d,i){
+      var rowFreq=tbody.querySelector('input[data-i="'+i+'"][data-f="freq"]');
+      var rowGainLot=tbody.querySelectorAll('.gain-lot')[i];
+      if(rowFreq && isChargementMachine(d)) rowFreq.value=Math.round(getLotFreq(d)*100)/100;
+      if(rowGainLot) rowGainLot.textContent=fmtGainLot(d);
+    });
 
     if(chart){
-      chart.data.labels=data.map(function(d){return d.name+' (\u00d7'+fmtFreq(d.freq||1)+')';});
+      chart.data.labels=data.map(function(d){return d.name+' (\u00d7'+fmtFreq(getLotFreq(d))+')';});
       chart.data.datasets[0].data=data.map(function(d){return d.old;});
       chart.data.datasets[1].data=data.map(function(d){return d.neo;});
       chart.update();
@@ -314,6 +366,10 @@
       if(f!=='name'){
         var pill=e.target.closest('tr').querySelector('.gain-pill');
         if(pill) pill.textContent=fmtGain(data[i]);
+        var gainMs=e.target.closest('tr').querySelector('.gain-ms');
+        if(gainMs) gainMs.textContent=fmtGainMs(data[i]);
+        var gainLot=e.target.closest('tr').querySelector('.gain-lot');
+        if(gainLot) gainLot.textContent=fmtGainLot(data[i]);
       }
       recompute();
     }
@@ -325,7 +381,7 @@
   document.getElementById('addRow').addEventListener('click',function(){
     data.push({name:"Nouvelle action",old:1000,neo:200,freq:1}); renderRows(); recompute();
   });
-  ['freq','postes','jours'].forEach(function(id){
+  ['freq','jours'].forEach(function(id){
     document.getElementById(id).addEventListener('input',recompute);
   });
 
@@ -341,7 +397,7 @@
 
   chart=new Chart(document.getElementById('chart'),{
     type:'bar',
-    data:{labels:data.map(function(d){return d.name+' (\u00d7'+fmtFreq(d.freq||1)+')';}),datasets:[
+    data:{labels:data.map(function(d){return d.name+' (\u00d7'+fmtFreq(getLotFreq(d))+')';}),datasets:[
       {label:'Ancien syst\u00e8me (PHP)',data:data.map(function(d){return d.old;}),backgroundColor:oldCol,borderRadius:4,maxBarThickness:46},
       {label:'Nouveau syst\u00e8me (Laravel / React)',data:data.map(function(d){return d.neo;}),backgroundColor:accent,borderRadius:4,maxBarThickness:46}
     ]},
